@@ -3,6 +3,7 @@ package http
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"mime/multipart"
@@ -179,6 +180,15 @@ func DoRequest(L *lua.LState) int {
 		L.Push(lua.LString(err.Error()))
 		return 2
 	}
+
+	metric := L.GetGlobal("lib_metric")
+	metricUd, ok := metric.(*lua.LUserData)
+	if ok && metricUd.Value != nil {
+		if keyValue, ok := metricUd.Value.(map[string]string); ok {
+			keyValue["http_body_size"] = fmt.Sprintf("%d", len(data))
+		}
+	}
+
 	result := L.NewTable()
 	L.SetField(result, `code`, lua.LNumber(response.StatusCode))
 	L.SetField(result, `body`, lua.LString(string(data)))
