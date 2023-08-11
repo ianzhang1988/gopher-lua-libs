@@ -3,7 +3,6 @@ package http
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"mime/multipart"
@@ -11,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/vadv/gopher-lua-libs/internal_matrics"
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -43,6 +43,7 @@ func NewRequest(L *lua.LState) int {
 	buffer := &bytes.Buffer{}
 	if L.GetTop() > 2 {
 		buffer.WriteString(L.CheckString(3))
+		internal_matrics.MatAdd(L, "http.send", float64(buffer.Len()))
 	}
 	httpReq, err := http.NewRequest(verb, url, buffer)
 	if err != nil {
@@ -157,6 +158,8 @@ func HeaderSet(L *lua.LState) int {
 //      headers = table
 //    }
 func DoRequest(L *lua.LState) int {
+	internal_matrics.MatAdd(L, "http.req_num", 1)
+
 	client := checkClient(L)
 	req := checkRequest(L, 2)
 
@@ -181,13 +184,14 @@ func DoRequest(L *lua.LState) int {
 		return 2
 	}
 
-	metric := L.GetGlobal("lib_metric")
-	metricUd, ok := metric.(*lua.LUserData)
-	if ok && metricUd.Value != nil {
-		if keyValue, ok := metricUd.Value.(map[string]string); ok {
-			keyValue["http_body_size"] = fmt.Sprintf("%d", len(data))
-		}
-	}
+	// metric := L.GetGlobal("lib_metric")
+	// metricUd, ok := metric.(*lua.LUserData)
+	// if ok && metricUd.Value != nil {
+	// 	if keyValue, ok := metricUd.Value.(map[string]string); ok {
+	// 		keyValue["http_body_size"] = fmt.Sprintf("%d", len(data))
+	// 	}
+	// }
+	internal_matrics.MatAdd(L, "http.receive", float64(len(data)))
 
 	result := L.NewTable()
 	L.SetField(result, `code`, lua.LNumber(response.StatusCode))
