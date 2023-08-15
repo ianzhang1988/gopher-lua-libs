@@ -2,9 +2,10 @@
 package tcp
 
 import (
-	lio "github.com/vadv/gopher-lua-libs/io"
 	"net"
 	"time"
+
+	lio "github.com/vadv/gopher-lua-libs/io"
 
 	lua "github.com/yuin/gopher-lua"
 )
@@ -27,10 +28,11 @@ type luaTCPClient struct {
 	writeTimeout time.Duration
 	readTimeout  time.Duration
 	closeTimeout time.Duration
+	protocal     string
 }
 
 func (c *luaTCPClient) connect() error {
-	conn, err := net.DialTimeout("tcp", c.address, c.dialTimeout)
+	conn, err := net.DialTimeout(c.protocal, c.address, c.dialTimeout)
 	if err != nil {
 		return err
 	}
@@ -43,7 +45,7 @@ func checkLuaTCPClient(L *lua.LState, n int) *luaTCPClient {
 	if v, ok := ud.Value.(*luaTCPClient); ok {
 		return v
 	}
-	L.ArgError(n, "tcp connection expected")
+	L.ArgError(n, "tcp/udp connection expected")
 	return nil
 }
 
@@ -56,7 +58,16 @@ func Open(L *lua.LState) int {
 		writeTimeout: DefaultWriteTimeout,
 		readTimeout:  DefaultReadTimeout,
 		closeTimeout: DefaultCloseTimeout,
+		protocal:     "tcp",
 	}
+
+	if L.GetTop() > 1 {
+		t.protocal = L.CheckString(2)
+		if !(t.protocal == "tcp" || t.protocal == "udp") {
+			t.protocal = "tcp"
+		}
+	}
+
 	if dialTimeout, ok := L.Get(2).(lua.LNumber); ok {
 		t.dialTimeout = time.Duration(dialTimeout * lua.LNumber(time.Second))
 	}

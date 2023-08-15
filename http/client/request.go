@@ -184,13 +184,6 @@ func DoRequest(L *lua.LState) int {
 		return 2
 	}
 
-	// metric := L.GetGlobal("lib_metric")
-	// metricUd, ok := metric.(*lua.LUserData)
-	// if ok && metricUd.Value != nil {
-	// 	if keyValue, ok := metricUd.Value.(map[string]string); ok {
-	// 		keyValue["http_body_size"] = fmt.Sprintf("%d", len(data))
-	// 	}
-	// }
 	internal_matrics.MatAdd(L, "http.receive", float64(len(data)))
 
 	result := L.NewTable()

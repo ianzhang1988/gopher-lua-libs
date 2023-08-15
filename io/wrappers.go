@@ -3,9 +3,11 @@ package io
 import (
 	"errors"
 	"fmt"
-	lua "github.com/yuin/gopher-lua"
 	"io"
 	"io/ioutil"
+
+	"github.com/vadv/gopher-lua-libs/internal_matrics"
+	lua "github.com/yuin/gopher-lua"
 )
 
 type luaIOWrapper struct {
@@ -151,6 +153,8 @@ func IOWriterWrite(L *lua.LState) int {
 		if _, err := io.WriteString(writer, s); err != nil {
 			L.ArgError(i+2, err.Error())
 			return 0
+		} else {
+			internal_matrics.MatAdd(L, "io.send", float64(len([]byte(s))))
 		}
 	}
 	return 0
@@ -183,6 +187,7 @@ func IOReaderRead(L *lua.LState) int {
 		}
 		buf := make([]byte, num)
 		numRead, err := reader.Read(buf)
+		internal_matrics.MatAdd(L, "io.receive", float64(numRead))
 		if err == io.EOF {
 			L.Push(lua.LNil)
 			return 1
@@ -224,6 +229,7 @@ func IOReaderRead(L *lua.LState) int {
 				L.RaiseError("%v", err)
 				return 0
 			}
+			internal_matrics.MatAdd(L, "io.receive", float64(len(data)))
 			L.Push(lua.LString(data))
 			return 1
 		case 'l':
@@ -236,6 +242,7 @@ func IOReaderRead(L *lua.LState) int {
 				L.RaiseError("%v", err)
 				return 0
 			}
+			internal_matrics.MatAdd(L, "io.receive", float64(len(line)))
 			L.Push(lua.LString(line))
 			return 1
 		}
