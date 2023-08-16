@@ -61,8 +61,8 @@ func Open(L *lua.LState) int {
 		protocal:     "tcp",
 	}
 
-	if L.GetTop() > 1 {
-		t.protocal = L.CheckString(2)
+	if L.GetTop() > 2 {
+		t.protocal = L.CheckString(3)
 		if !(t.protocal == "tcp" || t.protocal == "udp") {
 			t.protocal = "tcp"
 		}

@@ -22,5 +22,8 @@ if err then error(err) end
 local result, err = conn:read()
 if err then error(err) end
 if (result == "pong") then error("must be pong message") end
+
+-- udp conn (url, timeout, proto)
+local conn, err = tcp.open(":12345", 1, "udp") 
 ```
 
