@@ -5,6 +5,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/vadv/gopher-lua-libs/internal_matrics"
 	lio "github.com/vadv/gopher-lua-libs/io"
 
 	lua "github.com/yuin/gopher-lua"
@@ -87,6 +88,7 @@ func Open(L *lua.LState) int {
 func Write(L *lua.LState) int {
 	conn := checkLuaTCPClient(L, 1)
 	_ = conn.SetWriteDeadline(time.Now().Add(conn.writeTimeout))
+	internal_matrics.MatAdd(L, "sock.write_num", 1)
 	return lio.IOWriterWrite(L)
 }
 
@@ -98,6 +100,7 @@ func Read(L *lua.LState) int {
 		L.Push(lua.LNumber(1024))
 	}
 	_ = conn.SetReadDeadline(time.Now().Add(conn.readTimeout))
+	internal_matrics.MatAdd(L, "sock.read_num", 1)
 	return lio.IOReaderRead(L)
 }
 
