@@ -2,13 +2,16 @@ package http
 
 import (
 	"bytes"
+	"crypto/tls"
 	"errors"
 	"io"
 	"io/ioutil"
 	"mime/multipart"
 	"net/http"
+	"net/http/httptrace"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/vadv/gopher-lua-libs/internal_matrics"
 	lua "github.com/yuin/gopher-lua"
@@ -18,7 +21,21 @@ type luaRequest struct {
 	*http.Request
 }
 
+type luaRequestStatistics struct {
+	Start             time.Time
+	ConnectStart      time.Time
+	DnsStart          time.Time
+	TlsHandshakeStart time.Time
+	Ttfb              time.Duration
+	DnsResolve        time.Duration
+	ConnectTime       time.Duration
+	TlsHandshake      time.Duration
+	RequestWrote      time.Duration
+	Trace             *httptrace.ClientTrace
+}
+
 const luaRequestType = "http_request_ud"
+const luaRequestStatisitcsType = "http_request_statistics_ud"
 
 func checkRequest(L *lua.LState, n int) *luaRequest {
 	ud := L.CheckUserData(n)
@@ -55,6 +72,82 @@ func NewRequest(L *lua.LState) int {
 	req := &luaRequest{Request: httpReq}
 	req.Request.Header.Set(`User-Agent`, DefaultUserAgent)
 	L.Push(lvRequest(L, req))
+	return 1
+}
+
+func NewRequestStatistics() *luaRequestStatistics {
+
+	statistic := &luaRequestStatistics{}
+	statistic.Start = time.Now()
+
+	statistic.Trace = &httptrace.ClientTrace{
+		DNSStart: func(dsi httptrace.DNSStartInfo) { statistic.DnsStart = time.Now() },
+		DNSDone: func(ddi httptrace.DNSDoneInfo) {
+			statistic.DnsResolve = time.Since(statistic.DnsStart)
+		},
+
+		TLSHandshakeStart: func() { statistic.TlsHandshakeStart = time.Now() },
+		TLSHandshakeDone: func(cs tls.ConnectionState, err error) {
+			statistic.TlsHandshake = time.Since(statistic.TlsHandshakeStart)
+		},
+
+		ConnectStart: func(network, addr string) { statistic.ConnectStart = time.Now() },
+		ConnectDone: func(network, addr string, err error) {
+			statistic.ConnectTime = time.Since(statistic.ConnectStart)
+		},
+
+		GotFirstResponseByte: func() {
+			statistic.Ttfb = time.Since(statistic.Start)
+		},
+
+		WroteRequest: func(wri httptrace.WroteRequestInfo) {
+			statistic.RequestWrote = time.Since(statistic.Start)
+		},
+	}
+
+	return statistic
+}
+
+func checkStatistics(L *lua.LState, n int) *luaRequestStatistics {
+	ud := L.CheckUserData(n)
+	if v, ok := ud.Value.(*luaRequestStatistics); ok {
+		return v
+	}
+	L.ArgError(n, "http statistics expected")
+	return nil
+}
+
+func lvStatistics(L *lua.LState, statistics *luaRequestStatistics) lua.LValue {
+	ud := L.NewUserData()
+	ud.Value = statistics
+	L.SetMetatable(ud, L.GetTypeMetatable(luaRequestStatisitcsType))
+	return ud
+}
+
+func AttachStatistics(L *lua.LState) int {
+	req := checkRequest(L, 1)
+
+	statistic := NewRequestStatistics()
+
+	statisticReq := req.WithContext(httptrace.WithClientTrace(req.Context(), statistic.Trace))
+
+	req = &luaRequest{Request: statisticReq}
+	L.Push(lvRequest(L, req))
+	L.Push(lvStatistics(L, statistic))
+	return 2
+}
+
+func GetRequestStatistisc(L *lua.LState) int {
+	statistics := checkStatistics(L, 1)
+
+	statTable := L.NewTable()
+	statTable.RawSetString("ttfb", lua.LNumber(statistics.Ttfb.Seconds()))
+	statTable.RawSetString("dns", lua.LNumber(statistics.DnsResolve.Seconds()))
+	statTable.RawSetString("connect", lua.LNumber(statistics.ConnectTime.Seconds()))
+	statTable.RawSetString("wrote", lua.LNumber(statistics.RequestWrote.Seconds()))
+	statTable.RawSetString("tls", lua.LNumber(statistics.TlsHandshake.Seconds()))
+
+	L.Push(statTable)
 	return 1
 }
 
@@ -142,6 +235,13 @@ func SetBasicAuth(L *lua.LState) int {
 	return 0
 }
 
+func SetHost(L *lua.LState) int {
+	req := checkRequest(L, 1)
+	host := L.CheckAny(2).String()
+	req.Host = host
+	return 0
+}
+
 // request:header_set(key, value)
 func HeaderSet(L *lua.LState) int {
 	req := checkRequest(L, 1)
@@ -152,11 +252,12 @@ func HeaderSet(L *lua.LState) int {
 
 // DoRequest lua http_client_ud:do_request()
 // http_client_ud:do_request(http_request_ud) returns (response, error)
-//    response: {
-//      code = http_code (200, 201, ..., 500, ...),
-//      body = string
-//      headers = table
-//    }
+//
+//	response: {
+//	  code = http_code (200, 201, ..., 500, ...),
+//	  body = string
+//	  headers = table
+//	}
 func DoRequest(L *lua.LState) int {
 	internal_matrics.MatAdd(L, "http.req_num", 1)
 

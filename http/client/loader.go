@@ -9,7 +9,7 @@ import (
 // Preload adds http_client to the given Lua state's package.preload table. After it
 // has been preloaded, it can be loaded using require:
 //
-//  local http_client = require("http_client")
+//	local http_client = require("http_client")
 func Preload(L *lua.LState) {
 	L.PreloadModule("http_client", Loader)
 }
@@ -27,8 +27,14 @@ func Loader(L *lua.LState) int {
 	L.SetGlobal(luaRequestType, http_request_ud)
 	L.SetField(http_request_ud, "__index", L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
 		"set_basic_auth": SetBasicAuth,
+		"set_host":       SetHost,
 		"header_set":     HeaderSet,
 	}))
+
+	// http_request_statistiss_ud := L.NewTypeMetatable(luaRequestStatisitcsType)
+	// L.SetGlobal(luaRequestStatisitcsType, http_request_statistiss_ud)
+	// L.SetField(http_request_statistiss_ud, "__index", L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
+	// }))
 
 	t := L.NewTable()
 	L.SetFuncs(t, api)
@@ -37,7 +43,11 @@ func Loader(L *lua.LState) int {
 }
 
 var api = map[string]lua.LGFunction{
-	"client":       New,
-	"request":      NewRequest,
-	"file_request": NewFileRequest,
+	"client":            New,
+	"request":           NewRequest,
+	"file_request":      NewFileRequest,
+	"attach_statistics": AttachStatistics,
+	"get_statistics":    GetRequestStatistisc,
+	"custom_dial":       CustomDial,
+	"get_source_ipport": GetTargetIpPort,
 }

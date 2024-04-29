@@ -1,11 +1,14 @@
 package http
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httputil"
@@ -25,6 +28,8 @@ const (
 	// default don't ignore ssl
 	insecureSkipVerify = false
 )
+
+const luaSourceIpPortDialType = "http_source_ipport_dial_ud"
 
 type LuaClient struct {
 	*http.Client
@@ -79,6 +84,79 @@ func checkClient(L *lua.LState) *LuaClient {
 	}
 	L.ArgError(1, "http client expected")
 	return nil
+}
+
+type dialContext func(ctx context.Context, network, addr string) (net.Conn, error)
+
+type TargetIPPortDial struct {
+	TargetIpPort string
+	Timeout      int
+}
+
+func NewTargetIPPortDial(timeout int) *TargetIPPortDial {
+	return &TargetIPPortDial{
+		Timeout: timeout,
+	}
+}
+
+func checkTargetIPPortDial(L *lua.LState, n int) *TargetIPPortDial {
+	ud := L.CheckUserData(n)
+	if v, ok := ud.Value.(*TargetIPPortDial); ok {
+		return v
+	}
+	L.ArgError(n, "source ip dial expected")
+	return nil
+}
+func checkTargetIPPortDialValue(udv lua.LValue) *TargetIPPortDial {
+	if ud, ok := udv.(*lua.LUserData); ok {
+		if v, ok := ud.Value.(*TargetIPPortDial); ok {
+			return v
+		}
+	}
+	return nil
+}
+
+func lvTargetIPPortDial(L *lua.LState, sip *TargetIPPortDial) lua.LValue {
+	ud := L.NewUserData()
+	ud.Value = sip
+	L.SetMetatable(ud, L.GetTypeMetatable(luaSourceIpPortDialType))
+	return ud
+}
+
+func (tip *TargetIPPortDial) Dial(ctx context.Context, network, addr string) (net.Conn, error) {
+	conn, err := net.DialTimeout(network, addr, time.Duration(tip.Timeout)*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	tip.TargetIpPort = conn.RemoteAddr().String()
+	return conn, nil
+}
+
+// add custom dialcontext
+// return dialfunc, luaTable
+func CustomDial(L *lua.LState) int {
+	var dialType string
+	if L.GetTop() > 0 {
+		dialType = L.CheckString(1)
+	}
+
+	if dialType == "target_ipport" {
+		timeout := L.CheckInt(2)
+		sipDial := NewTargetIPPortDial(timeout)
+		L.Push(lvTargetIPPortDial(L, sipDial))
+		L.Push(lua.LNil)
+	} else {
+		L.Push(lua.LNil)
+		L.Push(lua.LString(fmt.Sprintf("%s not supported", dialType)))
+	}
+
+	return 2
+}
+
+func GetTargetIpPort(L *lua.LState) int {
+	tip := checkTargetIPPortDial(L, 1)
+	L.Push(lua.LString(tip.TargetIpPort))
+	return 1
 }
 
 // http.client(config) returns (user data, error)
@@ -218,6 +296,12 @@ func New(L *lua.LState) int {
 					client.headers = headers
 				} else {
 					L.ArgError(1, "headers must be table")
+				}
+			case `dial_context`:
+				if sipDial := checkTargetIPPortDialValue(v); sipDial != nil {
+					transport.DialContext = sipDial.Dial
+				} else {
+					L.ArgError(1, "dial must be SourceIPPortDial")
 				}
 			}
 		})

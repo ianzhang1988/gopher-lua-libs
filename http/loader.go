@@ -33,6 +33,7 @@ func Loader(L *lua.LState) int {
 	L.SetGlobal(`http_request_ud`, http_request_ud)
 	L.SetField(http_request_ud, "__index", L.SetFuncs(L.NewTable(), map[string]lua.LGFunction{
 		"set_basic_auth": client.SetBasicAuth,
+		"set_host":       client.SetHost,
 		"header_set":     client.HeaderSet,
 	}))
 
@@ -63,13 +64,17 @@ func Loader(L *lua.LState) int {
 }
 
 var api = map[string]lua.LGFunction{
-	"server":         server.New,
-	"serve_static":   server.ServeStaticFiles,
-	"client":         client.New,
-	"request":        client.NewRequest,
-	"file_request":   client.NewFileRequest,
-	"query_escape":   util.QueryEscape,
-	"query_unescape": util.QueryUnescape,
-	"parse_url":      util.ParseURL,
-	"build_url":      util.BuildURL,
+	"server":            server.New,
+	"serve_static":      server.ServeStaticFiles,
+	"client":            client.New,
+	"request":           client.NewRequest,
+	"file_request":      client.NewFileRequest,
+	"attach_statistics": client.AttachStatistics,
+	"get_statistics":    client.GetRequestStatistisc,
+	"custom_dial":       client.CustomDial,
+	"get_source_ipport": client.GetTargetIpPort,
+	"query_escape":      util.QueryEscape,
+	"query_unescape":    util.QueryUnescape,
+	"parse_url":         util.ParseURL,
+	"build_url":         util.BuildURL,
 }
