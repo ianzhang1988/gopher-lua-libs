@@ -124,7 +124,11 @@ func lvTargetIPPortDial(L *lua.LState, sip *TargetIPPortDial) lua.LValue {
 }
 
 func (tip *TargetIPPortDial) Dial(ctx context.Context, network, addr string) (net.Conn, error) {
-	conn, err := net.DialTimeout(network, addr, time.Duration(tip.Timeout)*time.Second)
+	// conn, err := net.DialTimeout(network, addr, time.Duration(tip.Timeout)*time.Second)
+	// code above does not pass context, causing statistics missing dns and connection callback
+
+	d := net.Dialer{Timeout: time.Duration(tip.Timeout) * time.Second}
+	conn, err := d.DialContext(ctx, network, addr)
 	if err != nil {
 		return nil, err
 	}

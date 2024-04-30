@@ -76,22 +76,27 @@ func NewRequest(L *lua.LState) int {
 }
 
 func NewRequestStatistics() *luaRequestStatistics {
-
 	statistic := &luaRequestStatistics{}
 	statistic.Start = time.Now()
 
 	statistic.Trace = &httptrace.ClientTrace{
-		DNSStart: func(dsi httptrace.DNSStartInfo) { statistic.DnsStart = time.Now() },
+		DNSStart: func(dsi httptrace.DNSStartInfo) {
+			statistic.DnsStart = time.Now()
+		},
 		DNSDone: func(ddi httptrace.DNSDoneInfo) {
 			statistic.DnsResolve = time.Since(statistic.DnsStart)
 		},
 
-		TLSHandshakeStart: func() { statistic.TlsHandshakeStart = time.Now() },
+		TLSHandshakeStart: func() {
+			statistic.TlsHandshakeStart = time.Now()
+		},
 		TLSHandshakeDone: func(cs tls.ConnectionState, err error) {
 			statistic.TlsHandshake = time.Since(statistic.TlsHandshakeStart)
 		},
 
-		ConnectStart: func(network, addr string) { statistic.ConnectStart = time.Now() },
+		ConnectStart: func(network, addr string) {
+			statistic.ConnectStart = time.Now()
+		},
 		ConnectDone: func(network, addr string, err error) {
 			statistic.ConnectTime = time.Since(statistic.ConnectStart)
 		},
