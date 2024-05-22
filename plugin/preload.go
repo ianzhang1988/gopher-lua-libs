@@ -18,6 +18,7 @@ import (
 	"github.com/vadv/gopher-lua-libs/ioutil"
 	"github.com/vadv/gopher-lua-libs/json"
 	"github.com/vadv/gopher-lua-libs/log"
+	net "github.com/vadv/gopher-lua-libs/net"
 	"github.com/vadv/gopher-lua-libs/pb"
 	"github.com/vadv/gopher-lua-libs/pprof"
 	prometheus "github.com/vadv/gopher-lua-libs/prometheus/client"
@@ -76,4 +77,5 @@ func PreloadAll(L *lua.LState) {
 	yaml.Preload(L)
 	zabbix.Preload(L)
 	internal_matrics.Preload(L)
+	net.Preload(L)
 }
