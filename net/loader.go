@@ -24,4 +24,5 @@ func Loader(L *lua.LState) int {
 
 var api = map[string]lua.LGFunction{
 	"dnslookup": DnsLookup,
+	"ping":      Ping,
 }
