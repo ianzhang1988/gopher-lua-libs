@@ -56,8 +56,6 @@ func Ping(L *lua.LState) int {
 	count := L.CheckInt(2)
 	if count < 1 {
 		count = 1
-	} else if count > 3 {
-		count = 3
 	}
 
 	pinger, err := ping.NewPinger(domain)
